@@ -1,0 +1,86 @@
+1.	Cache () is used to store the RDDs in memory so that we can reuse RDDs in iterative machine learning and spark applications
+2.	Spark is faster than mapReduce because spark use in-memory computation.
+3.	SparkContext used to set up internal services and established connection with spark execution environment and create RDDs to gather and broadcast variables on the cluster. Only one  sparkContext may be active per JVM.
+4.	RDDs are main logical data units that are distributed collection of objects and be stores in memory or disk on different cluster. A single RDD is divided into multiple partitions to store on different clusters.
+5.	reduceByKey()  combine the values for each key using reduce function because this works only for RDDS that contain key-value pairs. Where groupByKey just group datasets based on key that generate data shuffling when RDD is not partitioned due to this unnecessary data is being transferred over the network.
+6.	Read text file  from external source Hadoop then list each word that separated by space “ “  and make count of words using by reduceByKey() then save this count into a text File on Hadoop. 
+scala> val jul=spark.read.option("header","true").option("inferSchema","true").text("C:/Users/re038288/Downloads/NASA_access_log_Jul95/access_log_Jul95")
+scala> val aug=spark.read.option("header","true").option("inferSchema","true").text("C:/Users/re038288/Downloads/NASA_access_log_Aug95/access_log_Aug95")	
+val joindf=jul.unionAll(aug)
+val joindfparse=joindf.select(regexp_extract($"value",exp="""^([^(\s|,)]+)""",groupIdx=1).alias(alias="host"),regexp_extract($"value",exp="""^.*\[(\d\d/\w{3}/\d{4}:\d{2}:\d{2}:\d{2})""",groupIdx=1).as(alias="timestamp"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+)\s+HTTP.*""",groupIdx=1).as(alias="path"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+[^"])+\s""",groupIdx=1).cast(to="int").alias(alias="status"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+).*""",groupIdx=1).as(alias="Total_byte"))
+scala> joindf.count()
+res160: Long = 3461613
+
+scala> jul.count()+aug.count()
+res161: Long = 3461613
+
+•	val joindfparse=joindf.select(regexp_extract($"value",exp="""^([^(\s|,)]+)""",groupIdx=1).alias(alias="host"),regexp_extract($"value",exp="""^.*\[(\d\d/\w{3}/\d{4}:\d{2}:\d{2}:\d{2})""",groupIdx=1).as(alias="timestamp"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+)\s+HTTP.*""",groupIdx=1).as(alias="path"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+[^"])+\s""",groupIdx=1).cast(to="int").alias(alias="status"),regexp_extract($"value",exp="""^.*\w+\s+([^\s]+).*""",groupIdx=1).as(alias="Total_byte"))
+
+joindfparse.show(20,truncate=false)
+######################Question  1 ##########################################
+7.	val NoHost=joindfparse.select("host").distinct().count()
+7.1.	scala> print("No of Host are : ",NoHost)
+(No of Host are : ,137979)
+######################Question  2 ##########################################
+8.	scala> val err404=joindfparse.select("status").filter("status=404").count()
+err404: Long = 20899
+
+scala> print("Total No of error : ",err404)
+(Total No of error : ,20899)
+######################Question  3 ##########################################
+9.	scala> joindfparse.filter("status=404").groupBy("path").count().show(5,false)
++-------------------------------------------+-----+
+|path                                       |count|
++-------------------------------------------+-----+
+|/history/apollo/a-001/news/                |45   |
+|/shuttle/missions/sts-68/images/images.html|7    |
+|/history/apollo/apollo-13/apollo-13.html)  |4    |
+|/shuttle/sts-71/movies                     |1    |
+|/shuttle/missions/sts-77/ht                |4    |
++-------------------------------------------+-----+
+only showing top 5 rows
+######################Question  4 ##########################################
+10.	scala> val D=joindfparse.filter("status=404").withColumn("DATE1",$"timestamp".substr(lit(1),length($"timestamp")-9)).orderBy("DATE1").groupBy("DATE1").count().show(false)
++-----------+-----+
+|DATE1      |count|
++-----------+-----+
+|01/Aug/1995|243  |
+|01/Jul/1995|316  |
+|02/Jul/1995|291  |
+|03/Aug/1995|304  |
+|03/Jul/1995|474  |
+|04/Aug/1995|346  |
+|04/Jul/1995|359  |
+|05/Aug/1995|236  |
+|05/Jul/1995|497  |
+|06/Aug/1995|373  |
+|06/Jul/1995|640  |
+|07/Aug/1995|537  |
+|07/Jul/1995|569  |
+|08/Aug/1995|391  |
+|08/Jul/1995|302  |
+|09/Aug/1995|279  |
+|09/Jul/1995|348  |
+|10/Aug/1995|315  |
+|10/Jul/1995|398  |
+|11/Aug/1995|262  |
++-----------+-----+
+only showing top 20 rows
+######################Question  5 ##########################################
+11.	scala> joindfparse.describe("Total_byte").show(false)
++-------+------------------+
+|summary|Total_byte        |
++-------+------------------+
+|count  |3461613           |
+|mean   |19116.072581153352|
+|stddev |73367.37951430558 |
+|min    |                  |
+|max    |99981             |
++-------+------------------+
+
+scala> joindfparse.agg(sum("Total_byte")).show(false)
++---------------+
+|sum(Total_byte)|
++---------------+
+|6.5524314915E10|
+
